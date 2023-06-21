@@ -1,7 +1,14 @@
 import pygame
 import math
+import time
 import numpy as np
 
+import torch
+import pytorch_lightning as pl
+
+from lightning_model import DQNLightning
+from config import args
+from agent import World
 
 class Visualize:
     class Color():
@@ -36,45 +43,94 @@ class Visualize:
             for y in range(0, self.screen_height, self.box_height):
                 pygame.draw.rect(self.display, Visualize.Color.BLACK, [x, y, self.box_width, self.box_height], 1)
     
-    def _draw_box(self, x, y, color): # x, y are the center
-        pygame.draw.rect(self.display, color, [x - self.box_width/2, y - self.box_height/2, self.box_width, self.box_height])
+    def _draw_box(self, x, y, color): # x, y are indices in column and row
+        pygame.draw.rect(self.display, color, [x * self.box_width, y * self.box_height, self.box_width, self.box_height])
 
-    def _draw_goal(self, x, y, color): # x, y are the center
-        pygame.draw.ellipse(self.display, color, [x - self.box_width/2, y - self.box_height/2, self.box_width, self.box_height])
+    def _draw_goal(self, x, y, color): # x, y are indices in column and row
+        pygame.draw.ellipse(self.display, color, [x * self.box_width, y * self.box_height, self.box_width, self.box_height])
 
     def _update_display(self):
         pygame.display.update()
 
-    def draw_state(self, state_matrix):
-        y = self.box_height / 2
-        for row in state_matrix:
-            x = self.box_width / 2
-            for item in row:
-                if item == 0:
-                    self._draw_box(x, y, Visualize.Color.WHITE)
-                else:
-                    color = self.colors_list[abs(item) - 1]
-                    if item > 0: # is box
-                        self._draw_box(x, y, color)
-                    else: # is goal
-                        self._draw_goal(x, y, color)
-                x += self.box_width
-            y += self.box_height
+    def draw_state(self, world: World):
+        for column in range(self.num_columns):
+            for row in range(self.num_rows):
+                    self._draw_box(column, row, Visualize.Color.WHITE)
+
+        for agent_idx, agent_position in enumerate(world.current_positions):
+            color = self.colors_list[agent_idx]
+            column, row = agent_position
+            self._draw_box(column, row, color)
+
+        for agent_idx, agent_goal in enumerate(world.goal_positions):
+            color = self.colors_list[agent_idx]
+            column, row = agent_goal
+            self._draw_goal(column, row, color)
+
+        # y = 0
+        # for row in state_matrix:
+        #     x = 0
+        #     for item in row:
+        #         if item == 0:
+        #             self._draw_box(x, y, Visualize.Color.WHITE)
+        #         else:
+        #             color = self.colors_list[abs(item) - 1]
+        #             if item > 0: # is box
+        #                 self._draw_box(x, y, color)
+        #             else: # is goal
+        #                 self._draw_goal(x, y, color)
+        #         x += self.box_width
+        #     y += self.box_height
 
         self._draw_grid()
         self._update_display()
 
     def test(self):
-        self._draw_goal(self.box_width/2, self.box_height/2, (156, 100, 78))
+        self._draw_goal(0, 0, (156, 100, 78))
         self._update_display()
 
 
-if __name__ == '__main__':
-    visualize = Visualize(800, 800, 4, 4, 4)
-    state = [[1 ,0 , 0, -1],
-            [2 ,0 , 0, -4],
-            [3 ,0 , 0, -3],
-            [4 ,0 , 0, -2]]
-    visualize.draw_state(state)
+def main():
+    visualizer = Visualize(800, 800, 10, 10, args.num_agents)
+    model = DQNLightning.load_from_checkpoint(args.visualize_ckpt)
+    model.eval()
+
     while True:
-        pass
+        world = World(10, 10, args.num_agents)
+        done = False
+        agents_done = [False] * args.num_agents
+        while not done:
+            visualizer.draw_state(world)
+            for agent_idx in range(world.num_bots):
+                if agents_done[agent_idx]:
+                    continue
+                agent = world.agent_lists[agent_idx]
+                state = agent.get_state()
+                state = torch.tensor(state)
+                predictions = model(state)
+                _, sorted_actions = torch.sort(predictions, descending=True)
+
+                performed_the_move = False
+                for action in sorted_actions:
+                    if world.is_valid_action(action, agent_idx):
+                        _, done = world.perform_action(action, agent_idx)
+                        if done:
+                            agents_done[agent_idx] = True
+                        performed_the_move = True
+                        break
+
+                if not performed_the_move:
+                    raise RuntimeError("Cannot perform any move!")
+                
+            if all(agents_done):
+                time.sleep(0.5)
+                visualizer.draw_state(world)
+                time.sleep(5)
+                done = True
+                break
+            else:
+                time.sleep(0.5)
+
+
+if __name__ == '__main__':
+    main()

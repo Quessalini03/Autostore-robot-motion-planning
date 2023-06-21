@@ -88,6 +88,11 @@ class World:
             cur_col -= 1
         elif action == Action.RIGHT:
             cur_col += 1
+        
+        return (cur_col, cur_row)
+
+    def _move_inplace(self, action: int, agent_index: int):
+        cur_col, cur_row = self._move(action, agent_index)
 
         self.current_positions[agent_index] = (cur_col, cur_row)
 
@@ -115,7 +120,7 @@ class World:
 
     
     def perform_action(self, action: int, agent_index: int):
-        self._move(action, agent_index)
+        self._move_inplace(action, agent_index)
 
         done = 0
         reward = 0.0
@@ -132,11 +137,29 @@ class World:
             self.agent_lists[agent_index].is_alive = False
             return reward, done
         
-        reward = -0.05
+        reward = 0
         done = 0
         return reward, done
 
+    def is_valid_action(self, action: int, agent_index: int,):
+        current_position = self._move(action, agent_index)
+        curr_column, curr_row = current_position
+
+        if curr_column >= self.num_columns or \
+           curr_row >= self.num_rows or \
+           curr_column < 0 or \
+           curr_row < 0:
+            return False
         
+        for i in range(self.num_bots):
+            if i == agent_index:
+                continue
+            if self.agent_lists[i].is_alive == False:
+                continue
+            if self.current_positions[i] == current_position:
+                return False
+            
+        return True
 
     
 
@@ -220,7 +243,7 @@ class Agent:
         
     def get_epsilon(self):
         return_val = self.epsilon
-        self.epsilon -= self.epsilon_decrement
+        self.epsilon = self.epsilon - self.epsilon_decrement
         return return_val
 
     def get_action(self, net, state):

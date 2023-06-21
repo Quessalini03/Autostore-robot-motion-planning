@@ -16,6 +16,7 @@ class DQNLightning(pl.LightningModule):
     """Basic DQN Model."""
     def __init__(
         self,
+        num_epochs: int = args.num_epochs,
         batch_size: int = args.batch_size,
         lr: float = args.learning_rate,
         gamma: float = args.gamma,
@@ -33,8 +34,8 @@ class DQNLightning(pl.LightningModule):
         self.num_agents = num_agents
         self.save_hyperparameters()
 
-        self.net = DQN(args.state_dimension, args.num_actions, 256)
-        self.target_net = DQN(args.state_dimension, args.num_actions, 256)
+        self.net = DQN(args.state_dimension, args.num_actions, 200)
+        self.target_net = DQN(args.state_dimension, args.num_actions, 200)
         self.target_net.load_state_dict(self.net.state_dict())
         self.memory = ReplayBuffer(100000)
         self.world = World(num_columns, num_rows, num_agents)
@@ -56,13 +57,14 @@ class DQNLightning(pl.LightningModule):
     def dqn_loss(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
         states, actions, rewards, dones, next_states = batch
 
-        preds = self.target_net(states)
+        preds = self.net(states)
         targets = preds.clone()
 
         for i in range(len(dones)):
             Q_new = rewards[i]
             if not dones[i]:
-                Q_new = Q_new + self.hparams.gamma * torch.max(self.target_net(next_states[i]))
+                with torch.no_grad():
+                    Q_new = rewards[i] + self.hparams.gamma * torch.max(self.target_net(next_states[i]))
 
             targets[i][actions[i]] = Q_new
 
@@ -74,20 +76,23 @@ class DQNLightning(pl.LightningModule):
         rewards = []
         dones = []
         for agent_idx in range(self.num_agents):
-            reward, done = self.world.agent_lists[agent_idx].play_step(self.net, self.memory)
+            agent = self.world.agent_lists[agent_idx]
+            if not agent.is_alive:
+                continue
+            reward, done = agent.play_step(self.net, self.memory)
             rewards.append(reward)
             dones.append(done)
 
         step_reward = sum(rewards)
         self.episode_reward += step_reward
 
-        self.log("reward", step_reward)
+        self.log("reward", step_reward, prog_bar=True)
 
         # calculates training loss
         loss = self.dqn_loss(batch)
 
         if all(dones):
-            self.total_reward = self.episode_reward
+            self.total_reward = self.total_reward + self.episode_reward
             self.episode_reward = 0
             self.world = World(self.num_columns, self.num_rows, self.num_agents)
 
@@ -97,7 +102,6 @@ class DQNLightning(pl.LightningModule):
 
         self.log_dict(
             {
-                "reward": step_reward,
                 "train_loss": loss,
             }
         )
@@ -112,6 +116,7 @@ class DQNLightning(pl.LightningModule):
         dataloader = DataLoader(
             dataset=dataset,
             batch_size=self.hparams.batch_size,
+            num_workers=8
         )
         return dataloader
 
@@ -121,5 +126,13 @@ class DQNLightning(pl.LightningModule):
 
     def populate(self, steps: int = 1000) -> None:
         for _ in range(steps):
+            done_something = False
             for agent_idx in range(self.num_agents):
-                self.world.agent_lists[agent_idx].play_step(self.net, self.memory)   
+                agent = self.world.agent_lists[agent_idx]
+                if not agent.is_alive:
+                    continue
+                agent.play_step(self.net, self.memory)
+                done_something = True
+
+            if not done_something:
+                self.world = World(self.num_columns, self.num_rows, self.num_agents)
