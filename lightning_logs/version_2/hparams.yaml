@@ -1,0 +1,10 @@
+batch_size: 32
+gamma: 0.9
+lr: 0.002
+num_agents: 1
+num_columns: 12
+num_rows: 12
+patient_factor: 10
+replay_size: 10000
+sync_rate: 20
+warmup_steps: 1000

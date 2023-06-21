@@ -3,7 +3,10 @@ from typing import Tuple
 import numpy as np
 from copy import deepcopy
 
-from config import *
+import torch.nn as nn
+
+from config import args, Action
+from buffer import ReplayBuffer, Experience
 from net import DQN
 
 class World:
@@ -16,6 +19,7 @@ class World:
         self.current_positions = []
         self.goal_positions = []
         self.agent_lists = []
+        self.num_actions_performed = [0] * self.num_bots
         self._init_positions()
 
     def _init_positions(self):
@@ -56,7 +60,7 @@ class World:
         
         return True
 
-    def find_current_position(self, position: Tuple[int, int]):
+    def current_position_is_of(self, position: Tuple[int, int]):
         for i in range(self.num_bots):
             if self.agent_lists[i].is_alive == False:
                 continue
@@ -73,12 +77,72 @@ class World:
                 return i
         
         return -1
+    
+    def _move(self, action: int, agent_index: int):
+        cur_col, cur_row = self.current_positions[agent_index]
+        if action == Action.UP:
+            cur_row -= 1
+        elif action == Action.DOWN:
+            cur_row += 1
+        elif action == Action.LEFT:
+            cur_col -= 1
+        elif action == Action.RIGHT:
+            cur_col += 1
+
+        self.current_positions[agent_index] = (cur_col, cur_row)
+
+    def _is_collided(self, agent_index: int):
+        # collide with walls
+        current_position = self.current_positions[agent_index]
+        cur_col, cur_row = current_position
+        if  cur_col >= self.num_columns or \
+            cur_row >= self.num_rows or \
+            cur_col < 0 or \
+            cur_row < 0:
+                return True
+        
+        # collide with other lving agents
+        for i in range(self.num_bots):
+            if i == agent_index:
+                continue
+            if self.agent_lists[i].is_alive == False:
+                continue
+            if self.current_positions[i] == current_position:
+                return True
+            
+        return False
+
+
+    
+    def perform_action(self, action: int, agent_index: int):
+        self._move(action, agent_index)
+
+        done = 0
+        reward = 0.0
+        if self._is_collided(agent_index) or \
+           self.num_actions_performed[agent_index] >= (self.num_columns * self.num_rows + args.patient_factor * (self.num_bots - 1)):
+            done = 1
+            reward = -10.0
+            self.agent_lists[agent_index].is_alive = False
+            return reward, done
+        
+        if self.current_positions[agent_index] == self.goal_positions[agent_index]:
+            done = 1
+            reward = 10.0
+            self.agent_lists[agent_index].is_alive = False
+            return reward, done
+        
+        reward = -0.05
+        done = 0
+        return reward, done
+
+        
+
+    
+
 
 
 class Agent:
-    net = DQN(65, 5, 256)
-    target_net = DQN(61, 5, 256).load_state_dict(net.state_dict())
-
     def __init__(
         self,
         world: World,
@@ -113,7 +177,7 @@ class Agent:
                     return_state += [False] * 7
                     continue
 
-                other_agent_index = self.world.find_current_position((current_col + col_offset, current_row + row_offset))
+                other_agent_index = self.world.current_position_is_of((current_col + col_offset, current_row + row_offset))
                 if other_agent_index == -1: # no agent is at this position
                     return_state += [True] + [False] * 6
                 else:
@@ -154,19 +218,37 @@ class Agent:
 
         return np.array(return_state, dtype=int)
         
+    def get_epsilon(self):
+        return_val = self.epsilon
+        self.epsilon -= self.epsilon_decrement
+        return return_val
 
-    def get_action(self, state):
-        move = [0, 0, 0, 0, 0]
-        if np.random.random() < self.epsilon:
+    def get_action(self, net, state):
+        if np.random.random() < self.get_epsilon():
             move_index = np.random.randint(0, self.num_actions)
-            move[move_index] = 1
         else:
             current_state = torch.tensor(state, dtype=torch.float32)
-            prediction = Agent.net(current_state)
+            prediction = net(current_state)
             move_index = torch.argmax(prediction).item()
-            move[move_index] = 1
 
-        return move
+        return move_index
+    
+    def perform_action(self, action: int):
+        self.previous_move = action
+        return self.world.perform_action(action, self.index_in_world)
+    
+    @torch.no_grad()
+    def play_step(self, net: nn.Module, buffer: ReplayBuffer):
+        current_state = self.get_state()
+        action = self.get_action(net, current_state)
+
+        reward, done = self.perform_action(action)
+        new_state = self.get_state()
+        exp = Experience(current_state, action, reward, done, new_state)
+
+        buffer.append(exp)
+
+        return reward, done
         
 
 if __name__ == '__main__':
