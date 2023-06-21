@@ -134,10 +134,10 @@ class World:
         if self.current_positions[agent_index] == self.goal_positions[agent_index]:
             done = 1
             reward = 10.0
-            self.agent_lists[agent_index].is_alive = False
+            # self.agent_lists[agent_index].is_alive = False
             return reward, done
         
-        reward = 0
+        reward = -0.1
         done = 0
         return reward, done
 

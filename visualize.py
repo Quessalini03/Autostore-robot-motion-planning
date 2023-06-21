@@ -91,12 +91,12 @@ class Visualize:
 
 
 def main():
-    visualizer = Visualize(800, 800, 10, 10, args.num_agents)
+    visualizer = Visualize(800, 800, 7, 7, args.num_agents)
     model = DQNLightning.load_from_checkpoint(args.visualize_ckpt)
     model.eval()
 
     while True:
-        world = World(10, 10, args.num_agents)
+        world = World(7, 7, args.num_agents)
         done = False
         agents_done = [False] * args.num_agents
         while not done:
@@ -113,8 +113,8 @@ def main():
                 performed_the_move = False
                 for action in sorted_actions:
                     if world.is_valid_action(action, agent_idx):
-                        _, done = world.perform_action(action, agent_idx)
-                        if done:
+                        _, agent_done = world.perform_action(action, agent_idx)
+                        if agent_done:
                             agents_done[agent_idx] = True
                         performed_the_move = True
                         break
@@ -123,13 +123,13 @@ def main():
                     raise RuntimeError("Cannot perform any move!")
                 
             if all(agents_done):
-                time.sleep(0.5)
+                pygame.time.wait(500)
                 visualizer.draw_state(world)
-                time.sleep(5)
+                pygame.time.wait(5000)
                 done = True
                 break
             else:
-                time.sleep(0.5)
+                pygame.time.wait(500)
 
 
 if __name__ == '__main__':

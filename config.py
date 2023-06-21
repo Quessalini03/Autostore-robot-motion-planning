@@ -16,8 +16,8 @@ class args:
     patient_factor = 10
     warmup_steps = 1000
 
-    visualize_ckpt = './lightning_logs/version_4/checkpoints/epoch=1999-step=16000.ckpt'
-    train_ckpt = './lightning_logs/version_3/checkpoints/epoch=1999-step=16000.ckpt'
+    visualize_ckpt = './lightning_logs/version_5/checkpoints/epoch=1999-step=16000.ckpt'
+    train_ckpt = './lightning_logs/version_4/checkpoints/epoch=1999-step=16000.ckpt'
 
 
 class Action:
