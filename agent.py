@@ -21,6 +21,11 @@ class World:
         self.agent_lists = []
         self.num_actions_performed = [0] * self.num_bots
         self._init_positions()
+        self.frequent = []
+        for i in range(num_rows):
+            self.frequent.append([])
+            for j in range(num_columns):
+                self.frequent[i].append(0)
 
     def _init_positions(self):
         self.start_postitions.append(self._random_position())
@@ -42,6 +47,11 @@ class World:
 
         for i in range(self.num_bots):
             self.agent_lists.append(Agent(self, i))
+        self.frequent = []
+        for i in range(self.num_rows):
+            self.frequent.append([])
+            for j in range(self.num_columns):
+                self.frequent[i].append(0)    
 
     def _random_position(self):
         column = np.random.randint(0, self.num_columns)
@@ -120,6 +130,7 @@ class World:
 
     
     def perform_action(self, action: int, agent_index: int):
+        self.frequent[self.current_positions[agent_index][0]][self.current_positions[agent_index][1]] += 1.0
         self._move_inplace(action, agent_index)
 
         done = 0

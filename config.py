@@ -3,10 +3,10 @@ class args:
     gamma = 0.9
     epsilon_decrement = 0.5
     num_actions = 5
-    num_columns = 8
-    num_rows = 8
+    num_columns = 20
+    num_rows = 20
     state_dimension = 65
-    num_agents = 4
+    num_agents = 14
 
     num_epochs = 2000
     learning_rate = 2e-2
