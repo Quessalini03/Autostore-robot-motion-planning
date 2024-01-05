@@ -1,13 +1,33 @@
 import torch
-from config import args
-
+from trainer.BaseTrainer import BaseTrainer
 from models.QNet import QNetwork, QLoss, ReplayMemory, Experience
 from agent import World, Agent
+import yaml
 
 from torch.utils.tensorboard import SummaryWriter
 
-class Trainer():
+class args:
+    epsilon = 0.8
+    gamma = 0.8
+    epsilon_decrement = 0.00001
+    num_actions = 5
+    num_columns = 13
+    num_rows = 13
+    state_dimension = 65
+    num_agents = 10
+
+    num_epochs = 10000
+    learning_rate = 0.0001
+    sync_rate = 5
+    replay_size = 1000
+    batch_size = 128
+    patient_factor = 10
+    warmup_steps = 1000
+    time_to_live = 150
+
+class Trainer(BaseTrainer):
     def __init__(self) -> None:
+        super().__init__('DQ')
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy_net = QNetwork().to(self.device)
         self.policy_net.train()
@@ -17,8 +37,11 @@ class Trainer():
         self.memory = ReplayMemory(args.replay_size)
         self.criteria = QLoss()
         # default `log_dir` is "runs" - we'll be more specific here
-        self.writer = SummaryWriter('runs/DQ')
+        self.writer = SummaryWriter(self.get_run_directory())
         self.current_loss = float('inf')
+        self.model_path = self.get_model_path()
+
+        self.save_hyperparameters(args)
 
     def train_one(self, state, action, reward, next_state, done):
         output = self.policy_net(state)
@@ -59,7 +82,7 @@ class Trainer():
 
         if loss < self.current_loss:
             self.current_loss = loss
-            self.policy_net.save_model()
+            self.policy_net.save_model(self.model_path)
 
         if epoch % 10 == 0:
             self.writer.add_scalar('Loss/train', loss, epoch)
