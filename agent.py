@@ -2,12 +2,12 @@ import torch
 from typing import Tuple
 import numpy as np
 from copy import deepcopy
+from collections import deque
 
 import torch.nn as nn
 
 from config import args, Action
-from buffer import ReplayBuffer, Experience
-from net import DQN
+from models.QNet import QNetwork, QLoss, ReplayMemory, Experience
 
 class World:
     def __init__(self, num_columns, num_rows, num_bots) -> None:
@@ -15,11 +15,12 @@ class World:
         self.num_rows = num_rows
         self.num_bots = num_bots
 
+        self.wall_positions = []
         self.start_postitions = []
         self.current_positions = []
         self.goal_positions = []
         self.agent_lists = []
-        self.num_actions_performed = [0] * self.num_bots
+        self.num_actions_performed = [0 for _ in range(self.num_bots)]
         self._init_positions()
         self.frequent = []
         for i in range(num_rows):
@@ -28,11 +29,19 @@ class World:
                 self.frequent[i].append(0)
 
     def _init_positions(self):
-        self.start_postitions.append(self._random_position())
-        num_initialized_bots = 1
+        # TODO: add walls
+        for i in range(1, self.num_rows - 1):
+            self.wall_positions.append((0, i))
+            self.wall_positions.append((self.num_columns - 1, i))
+        
+        for i in range(self.num_columns):
+            self.wall_positions.append((i, 0))
+            self.wall_positions.append((i, self.num_rows - 1))
+
+        num_initialized_bots = 0
         while num_initialized_bots < self.num_bots:
             new_position = self._random_position()
-            if new_position not in self.start_postitions:
+            if new_position not in self.start_postitions and new_position not in self.wall_positions:
                 self.start_postitions.append(new_position)
                 num_initialized_bots += 1
 
@@ -41,7 +50,7 @@ class World:
         num_initialized_bots = 0
         while num_initialized_bots < self.num_bots:
             new_position = self._random_position()
-            if new_position not in self.start_postitions and new_position not in self.goal_positions:
+            if new_position not in self.start_postitions and new_position not in self.goal_positions and new_position not in self.wall_positions:
                 self.goal_positions.append(new_position)
                 num_initialized_bots += 1
 
@@ -61,12 +70,16 @@ class World:
     
     def is_valid_position(self, position, column_offset, row_offset):
         current_col, current_row = position
+        position = (current_col + column_offset, current_row + row_offset)
 
-        if current_col + column_offset < 0 or current_col + column_offset >= self.num_columns:
+        if position in self.wall_positions:
             return False
         
-        if current_row + row_offset < 0 or current_row + row_offset >= self.num_rows:
-            return False
+        if position[0] >= self.num_columns or \
+            position[1] >= self.num_rows or \
+            position[0] < 0 or \
+            position[1] < 0:
+                return False
         
         return True
 
@@ -109,14 +122,10 @@ class World:
     def _is_collided(self, agent_index: int):
         # collide with walls
         current_position = self.current_positions[agent_index]
-        cur_col, cur_row = current_position
-        if  cur_col >= self.num_columns or \
-            cur_row >= self.num_rows or \
-            cur_col < 0 or \
-            cur_row < 0:
-                return True
+        if current_position in self.wall_positions:
+            return True
         
-        # collide with other lving agents
+        # collide with other living agents
         for i in range(self.num_bots):
             if i == agent_index:
                 continue
@@ -130,25 +139,32 @@ class World:
 
     
     def perform_action(self, action: int, agent_index: int):
-        self.frequent[self.current_positions[agent_index][0]][self.current_positions[agent_index][1]] += 1.0
+        # self.frequent[self.current_positions[agent_index][0]][self.current_positions[agent_index][1]] += 1.0
         self._move_inplace(action, agent_index)
 
         done = 0
         reward = 0.0
-        if self._is_collided(agent_index) or \
-           self.num_actions_performed[agent_index] >= (self.num_columns * self.num_rows + args.patient_factor * (self.num_bots - 1)):
+        if self._is_collided(agent_index):
             done = 1
-            reward = -10.0
+            reward = -2
+            self.agent_lists[agent_index].is_alive = False
+            return reward, done
+        
+        agent = self.agent_lists[agent_index]
+        agent.time_to_live -= 1
+        if agent.time_to_live <= 0:
+            done = 1
+            reward = -0.01
             self.agent_lists[agent_index].is_alive = False
             return reward, done
         
         if self.current_positions[agent_index] == self.goal_positions[agent_index]:
             done = 1
-            reward = 10.0
+            reward = 2
             # self.agent_lists[agent_index].is_alive = False
             return reward, done
         
-        reward = -0.1
+        reward = -0.01
         done = 0
         return reward, done
 
@@ -177,92 +193,87 @@ class World:
 
 
 class Agent:
+    epsilon = args.epsilon
+    epsilon_decrement = args.epsilon_decrement
+    gamma = args.gamma
+
     def __init__(
         self,
         world: World,
         index_in_world: int,
-        epsilon = args.epsilon,
-        gamma = args.gamma,
-        epsilon_decrement = args.epsilon_decrement,
-        num_actions = args.num_actions
+        num_actions = args.num_actions,
+        time_to_live = args.patient_factor
     ):
         self.world = world
         self.index_in_world = index_in_world
-        self.epsilon = epsilon
-        self.gamma = gamma
-        self.epsilon_decrement = epsilon_decrement
         self.num_actions = num_actions
 
         self.is_alive = True
-        self.previous_move = 4 # static
+        self.time_to_live = time_to_live
+        # self.previous_move = 4 # static
+
+        self.default_state = [[0, 0, 0, 0, 0] for _ in range(5)]
+        self.observation_history = deque([self.default_state for _ in range(3)], maxlen=3)
+        self.is_first_observation = True
+
+    def reset(self):
+        self.is_alive = True
+        self.observation_history = deque([self.default_state for _ in range(3)], maxlen=3)
+        self.is_first_observation = True
 
     def get_state(self):
-        return_state = []
         current_position = self.world.current_positions[self.index_in_world]
         goal_position = self.world.goal_positions[self.index_in_world]
         
         current_col, current_row = current_position
         # check surrounding regions: [valid_position, other_agent_present, prev_move_up, prev_move_down, prev_move_left, prev_move_right, prev_move_static] * 8
-        for row_offset in range(-1, 2):
-            for col_offset in range(-1, 2):
+        # 5*5 center
+        center = (2, 2)
+        observation = [[0, 0, 0, 0, 0] for _ in range(5)]
+        for row_offset in range(-2, 3):
+            for col_offset in range(-2, 3):
                 if row_offset == 0 and col_offset == 0:
                     continue
                 if not self.world.is_valid_position(current_position, col_offset, row_offset):
-                    return_state += [False] * 7
+                    observation[center[0] + col_offset][center[1] + row_offset] = 1
+                    # print("Position: ", (current_position[0] + col_offset, current_position[1] + row_offset), " is not valid")
                     continue
 
                 other_agent_index = self.world.current_position_is_of((current_col + col_offset, current_row + row_offset))
-                if other_agent_index == -1: # no agent is at this position
-                    return_state += [True] + [False] * 6
-                else:
-                    other_agent_state_previous_move = [False] * 5
-                    other_agent_state_previous_move[self.world.agent_lists[other_agent_index].previous_move] = True
-                    return_state += [True] * 2 + other_agent_state_previous_move
+                if other_agent_index != -1: # another agent is at this position
+                    observation[center[0] + col_offset][center[1] + row_offset] = 1
+                    # print("Position: ", (current_position[0] + col_offset, current_position[1] + row_offset), " is occupied by another agent")
+                    continue
+
+                # print("Position: ", (current_position[0] + col_offset, current_position[1] + row_offset), " is valid")
         
-        # goal position: [up, down, left, right] relative to the agent
-        goal_col, goal_row = goal_position
-        goal_state = [
-            goal_row < current_row,
-            goal_row > current_row,
-            goal_col < current_col,
-            goal_col > current_col,
-        ]
-        return_state += goal_state
-
-        # TODO: blocking others goal: [is_blocking, agent_is_above, agent_is_below, agent_is_left, agent_is_right]
-        position_is_goal_of_index = self.world.goal_position_of(current_position)
-        if position_is_goal_of_index == -1 or position_is_goal_of_index == self.index_in_world:
-            return_state += [False] * 5
+        if self.is_first_observation:
+            self.is_first_observation = False
+            self.observation_history = deque([observation for _ in range(3)], maxlen=3)
         else:
-            blocking_agent_state = [False] * 4
-            blocking_agent_position = self.world.current_positions[position_is_goal_of_index]
-            diff_in_col, diff_in_row = current_position[0] - blocking_agent_position[0], current_position[1] - blocking_agent_position[1]
-            
-            if diff_in_col == -1 and diff_in_row == 0:
-                blocking_agent_state[3] = True
-            elif diff_in_col == 1 and diff_in_row == 0:
-                blocking_agent_state[2] = True
-            elif diff_in_col == 0 and diff_in_row == -1:
-                blocking_agent_state[1] = True
-            elif diff_in_col == 0 and diff_in_row == 1:
-                blocking_agent_state[0] = True
+            self.observation_history.append(observation)
 
-            return_state += [True] + blocking_agent_state
+        goal_col, goal_row = goal_position
+        goal_distance = goal_col - current_col, goal_row - current_row
             
+        state = {
+            "observation": torch.tensor(self.observation_history, dtype=torch.float32),
+            "goal": torch.tensor(goal_distance, dtype=torch.float32),
+        }
 
-        return np.array(return_state, dtype=int)
+        return state
         
     def get_epsilon(self):
-        return_val = self.epsilon
-        self.epsilon = self.epsilon - self.epsilon_decrement
+        return_val = Agent.epsilon
+        if Agent.epsilon > 0.1:
+            Agent.epsilon = Agent.epsilon - Agent.epsilon_decrement
         return return_val
 
-    def get_action(self, net, state):
+    def get_action(self, policy_net: QNetwork, state):
         if np.random.random() < self.get_epsilon():
             move_index = np.random.randint(0, self.num_actions)
         else:
-            current_state = torch.tensor(state, dtype=torch.float32)
-            prediction = net(current_state)
+            prediction = policy_net.forward(state)
             move_index = torch.argmax(prediction).item()
 
         return move_index
@@ -272,13 +283,13 @@ class Agent:
         return self.world.perform_action(action, self.index_in_world)
     
     @torch.no_grad()
-    def play_step(self, net: nn.Module, buffer: ReplayBuffer):
+    def play_step(self, net: nn.Module, buffer: ReplayMemory):
         current_state = self.get_state()
         action = self.get_action(net, current_state)
 
         reward, done = self.perform_action(action)
         new_state = self.get_state()
-        exp = Experience(current_state, action, reward, done, new_state)
+        exp = Experience(current_state, action, reward, new_state, done)
 
         buffer.append(exp)
 
@@ -286,10 +297,14 @@ class Agent:
         
 
 if __name__ == '__main__':
-    world = World(3, 3, 3)
+    world = World(5, 5, 3)
     print(world.start_postitions)
     print(world.goal_positions)
+    print(world.wall_positions)
+    print("Agent 1:")
     print(world.agent_lists[0].get_state())
+    print("Agent 2:")
     print(world.agent_lists[1].get_state())
+    print("Agent 3:")
     print(world.agent_lists[2].get_state())
     print(len(world.agent_lists[2].get_state()))
