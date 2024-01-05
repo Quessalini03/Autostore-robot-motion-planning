@@ -20,8 +20,8 @@ class QNetwork(torch.nn.Module):
         self.fc2 = torch.nn.Linear(64, 64)
         self.fc3 = torch.nn.Linear(64, 5)
 
-    def save_model(self):
-        torch.save(self.state_dict(), self.save_path + '/4.pt')
+    def save_model(self, path):
+        torch.save(self.state_dict(), path)
 
     def forward(self, state):
         observation = state["observation"]
