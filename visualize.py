@@ -73,6 +73,10 @@ class Visualize:
             column, row = agent_goal
             self._draw_goal(column, row, color)
 
+        for wall in world.wall_positions:
+            column, row = wall
+            self._draw_box(column, row, Visualize.Color.BLACK)
+
         # y = 0
         # for row in state_matrix:
         #     x = 0
