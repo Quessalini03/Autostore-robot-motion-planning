@@ -1,0 +1,17 @@
+batch_size: 128
+epsilon: 0.8
+epsilon_decrement: 1.0e-05
+gamma: 0.8
+learning_rate: 0.0001
+num_actions: 5
+num_agents: 10
+num_columns: 13
+num_epochs: 10000
+num_rows: 13
+patient_factor: 10
+replay_size: 1000
+state_dimension: 65
+sync_rate: 5
+tau: 0.01
+time_to_live: 150
+warmup_steps: 1000
