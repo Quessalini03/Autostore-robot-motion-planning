@@ -4,9 +4,11 @@ import random
 import numpy as np
 import os
 
+from models.BaseModel import BaseModel
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class QNetwork(torch.nn.Module):
+class QNetwork(BaseModel):
     def __init__(self, save_path='saved_models/DQN'):
         super().__init__()
         self.save_path = save_path
@@ -79,8 +81,8 @@ class ReplayMemory(object):
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
         states, actions, rewards, next_states, dones = zip(*[self.buffer[idx] for idx in indices])
 
-        return (states, torch.tensor(actions, dtype=torch.int8), torch.tensor(rewards, dtype=torch.float32),
-                next_states, torch.tensor(dones, dtype=torch.bool))
+        return (states, torch.tensor(actions, dtype=torch.int64).to(device), torch.tensor(rewards, dtype=torch.float32).to(device),
+                next_states, torch.tensor(dones, dtype=torch.bool).to(device))
     
 def main():
     # Check if GPU is available
@@ -110,6 +112,12 @@ def main():
     print(loss)
 
 if __name__ == "__main__":
-    main()
-    print(torch.nn.functional.one_hot(torch.tensor(2), 5))
-    print(torch.argmax(torch.tensor([0, 0, 0, 0, 1])))
+    # main()
+    source = torch.randint(0, 10, (3, 5))
+    print(source)
+    max_indexes = source.argmax(dim=1)
+    print(max_indexes)
+    result = torch.randint(0, 10, (3, 5))
+    print(result)
+    result = result.gather(1, max_indexes.unsqueeze(1))
+    print(result)
