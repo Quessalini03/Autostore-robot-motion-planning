@@ -24,6 +24,7 @@ class args:
     patient_factor = 10
     warmup_steps = 1000
     time_to_live = 150
+    tau = 0.01
 
 class Trainer(BaseTrainer):
     def __init__(self) -> None:
@@ -135,7 +136,7 @@ class Trainer(BaseTrainer):
             arrived_at_goal = 0
 
             if epoch % args.sync_rate == 0:
-                self.target_net.load_state_dict(self.policy_net.state_dict())
+                self.policy_net.soft_update(self.target_net, self.policy_net, args.tau)
             if epoch % 1000 == 0:
                 print(f"Epoch {epoch} done. Total reward: {total_reward}")
 
