@@ -7,10 +7,9 @@ import yaml
 from torch.utils.tensorboard import SummaryWriter
 
 class args:
-    epsilon = 0.8
-    gamma = 0.8
+    epsilon = 0.9
+    gamma = 0.7
     epsilon_decrement = 0.00001
-    num_actions = 5
     num_columns = 13
     num_rows = 13
     state_dimension = 65
@@ -21,8 +20,6 @@ class args:
     sync_rate = 5
     replay_size = 1000
     batch_size = 128
-    patient_factor = 10
-    warmup_steps = 1000
     time_to_live = 150
     tau = 0.01
 
@@ -85,8 +82,7 @@ class Trainer(BaseTrainer):
             self.current_loss = loss
             self.policy_net.save_model(self.model_path)
 
-        if epoch % 10 == 0:
-            self.writer.add_scalar('Loss/train', loss, epoch)
+        self.writer.add_scalar('Loss/train', loss, epoch)
         
 
     def train(self):
@@ -131,12 +127,11 @@ class Trainer(BaseTrainer):
             self.writer.add_scalar('Reward/epoch', total_reward, epoch)
             
             self.train_replay(epoch)
+            self.policy_net.soft_update(self.target_net, self.policy_net, args.tau)
 
             episode_reward = 0.0
             arrived_at_goal = 0
 
-            if epoch % args.sync_rate == 0:
-                self.policy_net.soft_update(self.target_net, self.policy_net, args.tau)
             if epoch % 1000 == 0:
                 print(f"Epoch {epoch} done. Total reward: {total_reward}")
 
