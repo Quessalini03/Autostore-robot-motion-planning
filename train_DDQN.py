@@ -7,22 +7,18 @@ import yaml
 from torch.utils.tensorboard import SummaryWriter
 
 class args:
-    epsilon = 0.8
-    gamma = 0.8
+    epsilon = 0.9
+    gamma = 0.7
     epsilon_decrement = 0.00001
     num_actions = 5
     num_columns = 13
     num_rows = 13
-    state_dimension = 65
     num_agents = 10
 
     num_epochs = 10000
     learning_rate = 0.0001
-    sync_rate = 5
     replay_size = 1000
     batch_size = 128
-    patient_factor = 10
-    warmup_steps = 1000
     time_to_live = 150
     tau = 0.01
 
