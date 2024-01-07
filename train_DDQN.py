@@ -103,12 +103,12 @@ class Trainer(BaseTrainer):
                     with torch.no_grad():
                         action = agent.get_action(self.policy_net, state)
                     # print(f"Agent {agent_idx} is moving in epoch {epoch} with action {action}")
-                    reward, done = agent.perform_action(action)
+                    reward, done, arrived = agent.perform_action(action)
                     next_state = agent.get_state()
                     # print(next_state)
                     exp = Experience(state, action, reward, next_state, done)
 
-                    if done and reward > 0:
+                    if arrived:
                         arrived_at_goal += 1
                     #     print(f"Agent {agent_idx} has reached the goal in epoch {epoch} with reward {reward}!")
 
