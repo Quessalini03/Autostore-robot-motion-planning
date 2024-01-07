@@ -173,11 +173,12 @@ class World:
 
         done = 0
         reward = 0.0
+        arrived = False
         if self._is_collided(agent_index):
             done = 1
             reward = -2
             self.agent_lists[agent_index].is_alive = False
-            return reward, done
+            return reward, done, arrived
         
         agent = self.agent_lists[agent_index]
         agent.time_to_live -= 1
@@ -185,20 +186,21 @@ class World:
             done = 1
             reward = -0.01
             self.agent_lists[agent_index].is_alive = False
-            return reward, done
+            return reward, done, arrived
         
         if self.current_positions[agent_index] == self.goal_positions[agent_index]:
             done = 1
             reward = 2
+            arrived = True
             # self.agent_lists[agent_index].is_alive = False
-            return reward, done
+            return reward, done, arrived
         
         prev_goal_distance = self.l2_distance(prev_position, self.goal_positions[agent_index])
         curr_goal_distance = self.l2_distance(self.current_positions[agent_index], self.goal_positions[agent_index])
         
         reward = self.omega * (prev_goal_distance - curr_goal_distance)
         done = 0
-        return reward, done
+        return reward, done, arrived
 
     def is_valid_action(self, action: int, agent_index: int,):
         current_position = self._move(action, agent_index)
