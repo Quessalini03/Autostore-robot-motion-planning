@@ -14,7 +14,7 @@ class World:
         self.num_columns = num_columns
         self.num_rows = num_rows
         self.num_bots = num_bots
-        self.omega = 2
+        self.omega = 0.5
 
         self.wall_positions = []
         self.start_postitions = []
