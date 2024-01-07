@@ -15,8 +15,8 @@ class QNetwork(BaseModel):
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
-        self.conv1 = torch.nn.Conv2d(3, 4, 3)
-        self.conv2 = torch.nn.Conv2d(4, 16, 3)
+        self.conv1 = torch.nn.Conv2d(3, 8, 3)
+        self.conv2 = torch.nn.Conv2d(8, 16, 3)
         
         self.fc1 = torch.nn.Linear(18, 64)
         self.fc2 = torch.nn.Linear(64, 64)
@@ -24,6 +24,9 @@ class QNetwork(BaseModel):
 
     def save_model(self, path):
         torch.save(self.state_dict(), path)
+
+    def load_model(self, path):
+        self.load_state_dict(torch.load(path))
 
     def forward(self, state):
         observation = state["observation"]
