@@ -1,0 +1,4 @@
+num_agents: 10
+num_columns: 7
+num_rows: 7
+num_scenarios: 10000
