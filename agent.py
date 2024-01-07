@@ -14,12 +14,20 @@ class World:
         self.num_columns = num_columns
         self.num_rows = num_rows
         self.num_bots = num_bots
+        self.omega = 2
 
         self.wall_positions = []
         self.start_postitions = []
         self.current_positions = []
         self.goal_positions = []
         self.agent_lists = []
+
+        self.wall_positions_copy = []
+        self.start_postitions_copy = []
+        self.current_positions_copy = []
+        self.goal_positions_copy = []
+
+
         self.num_actions_performed = [0 for _ in range(self.num_bots)]
         self._init_positions()
         self.frequent = []
@@ -29,7 +37,6 @@ class World:
                 self.frequent[i].append(0)
 
     def _init_positions(self):
-        # TODO: add walls
         for i in range(1, self.num_rows - 1):
             self.wall_positions.append((0, i))
             self.wall_positions.append((self.num_columns - 1, i))
@@ -60,7 +67,27 @@ class World:
         for i in range(self.num_rows):
             self.frequent.append([])
             for j in range(self.num_columns):
-                self.frequent[i].append(0)    
+                self.frequent[i].append(0)
+
+        self.wall_positions_copy = deepcopy(self.wall_positions)
+        self.start_postitions_copy = deepcopy(self.start_postitions)
+        self.current_positions_copy = deepcopy(self.current_positions)
+        self.goal_positions_copy = deepcopy(self.goal_positions)   
+
+    def eval(self):
+        for i in range(self.num_bots):
+            self.agent_lists[i].eval()
+
+    def reset(self):
+        self.wall_positions = deepcopy(self.wall_positions_copy)
+        self.start_postitions = deepcopy(self.start_postitions_copy)
+        self.current_positions = deepcopy(self.current_positions_copy)
+        self.goal_positions = deepcopy(self.goal_positions_copy)
+
+        for i in range(self.num_bots):
+            self.agent_lists[i].reset()
+
+        self.num_actions_performed = [0 for _ in range(self.num_bots)]
 
     def _random_position(self):
         column = np.random.randint(0, self.num_columns)
@@ -136,10 +163,12 @@ class World:
             
         return False
 
+    def l2_distance(self, position1, position2):
+        return np.sqrt((position1[0] - position2[0])**2 + (position1[1] - position2[1])**2)
 
-    
     def perform_action(self, action: int, agent_index: int):
         # self.frequent[self.current_positions[agent_index][0]][self.current_positions[agent_index][1]] += 1.0
+        prev_position = self.current_positions[agent_index]
         self._move_inplace(action, agent_index)
 
         done = 0
@@ -164,7 +193,10 @@ class World:
             # self.agent_lists[agent_index].is_alive = False
             return reward, done
         
-        reward = -0.01
+        prev_goal_distance = self.l2_distance(prev_position, self.goal_positions[agent_index])
+        curr_goal_distance = self.l2_distance(self.current_positions[agent_index], self.goal_positions[agent_index])
+        
+        reward = self.omega * (prev_goal_distance - curr_goal_distance)
         done = 0
         return reward, done
 
@@ -201,22 +233,28 @@ class Agent:
         self,
         world: World,
         index_in_world: int,
-        num_actions = args.num_actions,
-        time_to_live = args.patient_factor
+        time_to_live = 150,
+        num_actions = 5,
+        eval = False
     ):
         self.world = world
         self.index_in_world = index_in_world
-        self.num_actions = num_actions
+        self.is_eval = eval
 
         self.is_alive = True
         self.time_to_live = time_to_live
+        self.num_actions = 5
         # self.previous_move = 4 # static
 
         self.default_state = [[0, 0, 0, 0, 0] for _ in range(5)]
         self.observation_history = deque([self.default_state for _ in range(3)], maxlen=3)
         self.is_first_observation = True
 
+    def eval(self):
+        self.is_eval = True
+
     def reset(self):
+        self.time_to_live = 150
         self.is_alive = True
         self.observation_history = deque([self.default_state for _ in range(3)], maxlen=3)
         self.is_first_observation = True
@@ -270,6 +308,13 @@ class Agent:
         return return_val
 
     def get_action(self, policy_net: QNetwork, state):
+        if self.is_eval:
+            prediction = policy_net.forward(state)
+            move_index = torch.argmax(prediction).item()
+
+            return move_index
+
+        # in training mode
         if np.random.random() < self.get_epsilon():
             move_index = np.random.randint(0, self.num_actions)
         else:
