@@ -19,3 +19,17 @@ class BaseEvaluator():
 
     def get_eval_directory(self):
         return self.eval_directory
+    
+    def get_params_path(self):
+        return self.eval_directory + '/' + 'params.yaml'
+    
+    def save_evaluate_params(self, class_name):
+        class_attributes = class_name.__dict__
+
+        # Remove special methods and class attributes
+        class_attributes = {key: value for key, value in class_attributes.items() if not key.startswith("__") and not callable(value)}
+
+        # Save class attributes to YAML file
+        with open(self.get_params_path(), 'w') as file:
+            yaml.dump(class_attributes, file, default_flow_style=False)
+        
