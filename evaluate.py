@@ -20,11 +20,11 @@ class Evaluator(BaseEvaluator):
         super().__init__('DQN_DDQN')
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy_net_DQN = QNetwork().to(self.device)
-        self.policy_net_DQN.load_model('runs/DQN/run_2/model.pt')
+        self.policy_net_DQN.load_model('runs/DQN/run_5/model.pt')
         self.policy_net_DQN.eval()
 
         self.policy_net_DDQN = QNetwork().to(self.device)
-        self.policy_net_DDQN.load_model('runs/DDQN/run_0/model.pt')
+        self.policy_net_DDQN.load_model('runs/DDQN/run_1/model.pt')
         self.policy_net_DDQN.eval()
 
         self.writer_DQN = SummaryWriter(self.get_eval_directory() + '/DQN')
