@@ -3,6 +3,7 @@ from typing import Tuple
 import numpy as np
 from copy import deepcopy
 from collections import deque
+import random
 
 import torch.nn as nn
 
@@ -231,6 +232,8 @@ class Agent:
     epsilon_decrement = args.epsilon_decrement
     gamma = args.gamma
 
+    obstacle_weight_vector = torch.tensor([0.2, 0.4, 0.6, 0.8, 1.0], dtype=torch.float32)
+
     def __init__(
         self,
         world: World,
@@ -252,6 +255,89 @@ class Agent:
         self.observation_history = deque([self.default_state for _ in range(3)], maxlen=3)
         self.is_first_observation = True
 
+        # heuristic
+        self.temporary_goal = None
+        self.default_seen_obstacles = [0 for _ in range(5)]
+        self.seen_obstacles = deque(self.default_seen_obstacles, maxlen=5)
+        self.remaining_policy_steps = 0
+
+        # statistics
+        self.starting_distance_to_goal = self.get_starting_distance_to_goal()
+        self.distance_travelled = 0
+
+    def get_starting_distance_to_goal(self):
+        current_position = self.world.current_positions[self.index_in_world]
+        goal_position = self.world.goal_positions[self.index_in_world]
+
+        current_col, current_row = current_position
+        goal_col, goal_row = goal_position
+
+        return abs(current_col - goal_col) + abs(current_row - goal_row)
+
+    def set_temporary_goal(self, goal):
+        self.temporary_goal = goal
+
+    def calculate_temporary_goal(self):
+        on_goal_row_axis = random.choice([True, False])
+        if on_goal_row_axis:
+            self.temporary_goal = (self.world.current_positions[self.index_in_world][0], self.world.goal_positions[self.index_in_world][1])
+        else:
+            self.temporary_goal = (self.world.goal_positions[self.index_in_world][0], self.world.current_positions[self.index_in_world][1])
+
+    def has_obstacles(self, state):
+        surrounding = state["observation"][2]
+        return sum(map(sum, surrounding)) > 0
+    
+    def see_obstacle(self):
+        self.seen_obstacles.append(1)
+
+    def should_move_heuristic(self, state):
+        if self.has_obstacles(state):
+            return False
+        if self.temporary_goal == None:
+            self.calculate_temporary_goal()
+            return True
+        if self.world.current_positions[self.index_in_world] == self.temporary_goal:
+            self.temporary_goal = self.world.goal_positions[self.index_in_world]
+            return True
+        
+        return True
+    
+    def get_heuristic_action(self):
+        current_position = self.world.current_positions[self.index_in_world]
+        goal_position = self.temporary_goal
+
+        current_col, current_row = current_position
+        goal_col, goal_row = goal_position
+
+        if current_col == goal_col:
+            if current_row < goal_row:
+                return Action.DOWN
+            else:
+                return Action.UP
+        elif current_row == goal_row:
+            if current_col < goal_col:
+                return Action.RIGHT
+            else:
+                return Action.LEFT
+        else:
+            raise Exception("Invalid temporary goal " + str(self.temporary_goal) + " with position " + str(current_position))
+        
+    def should_force_policy(self):
+        return self.remaining_policy_steps > 0
+    
+    def post_force_policy(self):
+        if self.remaining_policy_steps > 0:
+            self.remaining_policy_steps -= 1
+            if self.remaining_policy_steps == 0:
+                self.calculate_temporary_goal()
+        else:
+            raise Exception("Remaining policy steps is not greater than 0 after force policy")
+
+    def post_normal_policy(self):
+        self.remaining_policy_steps = torch.tensor(self.seen_obstacles, dtype=torch.float32).dot(Agent.obstacle_weight_vector).item()
+        self.remaining_policy_steps = int(self.remaining_policy_steps)
+
     def eval(self):
         self.is_eval = True
 
@@ -260,6 +346,10 @@ class Agent:
         self.is_alive = True
         self.observation_history = deque([self.default_state for _ in range(3)], maxlen=3)
         self.is_first_observation = True
+        self.seen_obstacles = deque(self.default_seen_obstacles, maxlen=5)
+        self.remaining_policy_steps = 0
+        self.distance_travelled = 0
+        self.temporary_goal = None
 
     def get_state(self):
         current_position = self.world.current_positions[self.index_in_world]
@@ -301,6 +391,9 @@ class Agent:
             "goal": torch.tensor(goal_distance, dtype=torch.float32),
         }
 
+        if self.has_obstacles(state):
+            self.see_obstacle()
+
         return state
         
     def get_epsilon(self):
@@ -327,7 +420,20 @@ class Agent:
     
     def perform_action(self, action: int):
         self.previous_move = action
+        self.distance_travelled += 1
         return self.world.perform_action(action, self.index_in_world)
+    
+    # def play_step_force_policy(self, net: nn.Module, buffer: ReplayMemory):
+    #     current_state = self.get_state()
+    #     action = self.get_action(net, current_state)
+
+    #     reward, done = self.perform_action(action)
+    #     new_state = self.get_state()
+    #     exp = Experience(current_state, action, reward, new_state, done)
+
+    #     buffer.append(exp)
+
+    #     return reward, done
     
     @torch.no_grad()
     def play_step(self, net: nn.Module, buffer: ReplayMemory):
