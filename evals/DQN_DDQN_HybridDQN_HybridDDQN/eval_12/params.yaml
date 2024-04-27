@@ -1,0 +1,4 @@
+num_agents: 5
+num_columns: 18
+num_rows: 18
+num_scenarios: 1000

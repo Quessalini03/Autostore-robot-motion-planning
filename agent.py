@@ -249,7 +249,7 @@ class Agent:
         self.is_alive = True
         self.time_to_live = time_to_live
         self.num_actions = 5
-        # self.previous_move = 4 # static
+        self.previous_move = 0
 
         self.default_state = [[0, 0, 0, 0, 0] for _ in range(5)]
         self.observation_history = deque([self.default_state for _ in range(3)], maxlen=3)
@@ -264,6 +264,7 @@ class Agent:
         # statistics
         self.starting_distance_to_goal = self.get_starting_distance_to_goal()
         self.distance_travelled = 0
+        self.num_direction_changes = 0
 
     def get_starting_distance_to_goal(self):
         current_position = self.world.current_positions[self.index_in_world]
@@ -286,7 +287,7 @@ class Agent:
 
     def has_obstacles(self, state):
         surrounding = state["observation"][2]
-        return sum(map(sum, surrounding)) > 0
+        return torch.sum(surrounding) > 0
     
     def see_obstacle(self):
         self.seen_obstacles.append(1)
@@ -294,6 +295,7 @@ class Agent:
     def should_move_heuristic(self, state):
         if self.has_obstacles(state):
             return False
+        
         if self.temporary_goal == None:
             self.calculate_temporary_goal()
             return True
@@ -335,8 +337,7 @@ class Agent:
             raise Exception("Remaining policy steps is not greater than 0 after force policy")
 
     def post_normal_policy(self):
-        self.remaining_policy_steps = torch.tensor(self.seen_obstacles, dtype=torch.float32).dot(Agent.obstacle_weight_vector).item()
-        self.remaining_policy_steps = int(self.remaining_policy_steps)
+        self.temporary_goal = None
 
     def eval(self):
         self.is_eval = True
@@ -350,6 +351,7 @@ class Agent:
         self.remaining_policy_steps = 0
         self.distance_travelled = 0
         self.temporary_goal = None
+        self.num_direction_changes = 0
 
     def get_state(self):
         current_position = self.world.current_positions[self.index_in_world]
@@ -391,8 +393,8 @@ class Agent:
             "goal": torch.tensor(goal_distance, dtype=torch.float32),
         }
 
-        if self.has_obstacles(state):
-            self.see_obstacle()
+        # if self.has_obstacles(state):
+        #     self.see_obstacle()
 
         return state
         
@@ -419,7 +421,10 @@ class Agent:
         return move_index
     
     def perform_action(self, action: int):
-        self.previous_move = action
+        if self.previous_move != action:
+            self.num_direction_changes += 1
+            self.previous_move = action
+
         self.distance_travelled += 1
         return self.world.perform_action(action, self.index_in_world)
     
