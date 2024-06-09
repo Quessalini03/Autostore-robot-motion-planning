@@ -1,0 +1,2 @@
+,Reward per agent,Arrival rate,Real Path/Ideal Path,# direction changes/scenario,Time to arrive,Simulation time/scenario
+DDQN,6.693688682974081,1.0,1.0080805802984176,71.54,0.05114765107631683,0.06920046091079712

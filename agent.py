@@ -13,10 +13,11 @@ from models.QNet import QNetwork, QLoss, ReplayMemory, Experience
 
 
 class World:
-    def __init__(self, num_columns, num_rows, num_bots) -> None:
+    def __init__(self, num_columns, num_rows, num_bots, obstacle_matrix = None) -> None:
         self.num_columns = num_columns
         self.num_rows = num_rows
         self.num_bots = num_bots
+        self.obstacle_matrix = obstacle_matrix
         self.omega = 0.5
 
         self.wall_positions = []
@@ -31,12 +32,20 @@ class World:
         self.goal_positions_copy = []
 
         self.num_actions_performed = [0 for _ in range(self.num_bots)]
+        if self.obstacle_matrix is not None:
+            self.add_obstacles()
         self._init_positions()
         self.frequent = []
         for i in range(num_rows):
             self.frequent.append([])
             for j in range(num_columns):
                 self.frequent[i].append(0)
+
+    def add_obstacles(self):
+        for i in range(self.num_columns - 2):
+            for j in range(self.num_rows - 2):
+                if self.obstacle_matrix[i][j] == 1:
+                    self.wall_positions.append((i, j))
 
     def _init_positions(self):
         for i in range(1, self.num_rows - 1):
@@ -46,6 +55,8 @@ class World:
         for i in range(self.num_columns):
             self.wall_positions.append((i, 0))
             self.wall_positions.append((i, self.num_rows - 1))
+
+        # Add obstacles
 
         num_initialized_bots = 0
         while num_initialized_bots < self.num_bots:

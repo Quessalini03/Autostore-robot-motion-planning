@@ -16,13 +16,34 @@ class args:
     num_agents = 32
 
     num_scenarios = 1000
+    obstacle_matrix_1 = [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,],
+        [0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,],
+        [0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,],
+        [0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,],
+        [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+        [0,1,0,0,0,0,0,0,1,1,1,1,1,0,0,0,],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+    ]
+
+    obstacle_matrix_2 = None
+    obstacle_matrix = obstacle_matrix_2
 
 class Evaluator(BaseEvaluator):
     def __init__(self) -> None:
-        super().__init__('DQN_DDQN_HybridDQN_HybridDDQN')
+        super().__init__('DQN_DDQN_HybridDQN_HybridDDQN_with_obstacles')
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy_net_DQN = QNetwork().to(self.device)
-        self.policy_net_DQN.load_model('runs/DQN/run_5/model.pt')
+        self.policy_net_DQN.load_model('runs/DQN/run_4/model.pt')
         self.policy_net_DQN.eval()
 
         self.policy_net_DDQN = QNetwork().to(self.device)
@@ -39,7 +60,7 @@ class Evaluator(BaseEvaluator):
         self.save_evaluate_params(args)
 
     def evaluate(self):
-        world = World(args.num_columns, args.num_rows, args.num_agents)
+        world = World(args.num_columns, args.num_rows, args.num_agents, args.obstacle_matrix)
         world.eval()
         progess_bar = tqdm(total=args.num_scenarios, desc="Scenarios completed", leave=True, unit_scale=True, unit='Scenario', colour='green')
 
@@ -257,7 +278,7 @@ class Evaluator(BaseEvaluator):
             self.writer_HybridDDQN.add_scalar('Total reward', total_reward_HybridDDQN, scenario)
 
             # hard reset world
-            world = World(args.num_columns, args.num_rows, args.num_agents)
+            world = World(args.num_columns, args.num_rows, args.num_agents, args.obstacle_matrix)
             world.eval()
 
             progess_bar.update(1)
