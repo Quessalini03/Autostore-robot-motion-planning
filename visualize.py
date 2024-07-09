@@ -163,6 +163,7 @@ def main():
 
                 tmp = 10
                 # print(frequent[i][j])
+                frequent[i][j] += 1
 
                 for tup_idx in range(len(value_actions)):
                     val, action = value_actions[tup_idx]
@@ -211,11 +212,11 @@ def main():
                 pygame.time.wait(500)
                 old_position = world.current_positions
                 visualizer.draw_state(world, old_position)
-                pygame.time.wait(500)
+                pygame.time.wait(200)
                 done = True
                 break
             else:
-                pygame.time.wait(500)
+                pygame.time.wait(200)
 
             counter += 1
 

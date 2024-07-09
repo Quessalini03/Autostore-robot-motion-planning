@@ -4,6 +4,7 @@ import numpy as np
 from copy import deepcopy
 from collections import deque
 import random
+import math
 
 import torch.nn as nn
 
@@ -221,6 +222,11 @@ class World:
             if self.agent_lists[i].is_alive == False:
                 continue
             if self.current_positions[i] == current_position:
+                return False
+            x1, y1 = self.current_positions[i]
+            x2, y2 = current_position
+            d = math.sqrt((x1 - x2)**2 + (y1-y2)**2)
+            if d < 1.0:
                 return False
 
         return True
