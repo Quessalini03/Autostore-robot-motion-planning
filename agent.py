@@ -129,21 +129,21 @@ class World:
 
         return -1
 
-    def _move(self, action: int, agent_index: int):
+    def _move(self, action: int, agent_index: int, step_value=1):
         cur_col, cur_row = self.current_positions[agent_index]
         if action == Action.UP:
-            cur_row -= 1
+            cur_row -= 1 * step_value
         elif action == Action.DOWN:
-            cur_row += 1
+            cur_row += 1 * step_value
         elif action == Action.LEFT:
-            cur_col -= 1
+            cur_col -= 1 * step_value
         elif action == Action.RIGHT:
-            cur_col += 1
+            cur_col += 1 * step_value
 
         return (cur_col, cur_row)
 
-    def _move_inplace(self, action: int, agent_index: int):
-        cur_col, cur_row = self._move(action, agent_index)
+    def _move_inplace(self, action: int, agent_index: int, step_value=1):
+        cur_col, cur_row = self._move(action, agent_index, step_value)
 
         self.current_positions[agent_index] = (cur_col, cur_row)
 
@@ -170,7 +170,7 @@ class World:
     def perform_action(self, action: int, agent_index: int, step_value=1):
         # self.frequent[self.current_positions[agent_index][0]][self.current_positions[agent_index][1]] += 1.0
         prev_position = self.current_positions[agent_index]
-        self._move_inplace(action, agent_index)
+        self._move_inplace(action, agent_index, step_value)
 
         done = 0
         reward = 0.0

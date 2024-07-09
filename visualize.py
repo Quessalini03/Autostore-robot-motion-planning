@@ -76,7 +76,11 @@ class Visualize:
 
         for agent_idx, agent_position in enumerate(world.current_positions):
             color = self.colors_list[agent_idx]
-            column, row = agent_position
+            # column, row = agent_position
+            column, row = (agent_position[0] - old_position[agent_idx][0]) * 2 + \
+                old_position[agent_idx][0], (agent_position[1] -
+                                             old_position[agent_idx][1]) * 2 + old_position[agent_idx][1]
+
             self._draw_box(column, row, color, True)
 
         for agent_idx, agent_goal in enumerate(world.goal_positions):
@@ -128,6 +132,8 @@ def main():
         done = False
         agents_done = [False] * args.num_agents
         frequent = world.frequent
+        counter = 0
+        old_actions = [0] * args.num_agents
         while not done:
             old_position = world.current_positions.copy()
             for agent_idx in range(world.num_bots):
@@ -135,6 +141,15 @@ def main():
                     continue
                 agent = world.agent_lists[agent_idx]
                 state = agent.get_state()
+
+                if counter % 4 != 0:
+                    action = old_actions[agent_idx]
+                    reward, agent_done, arrived = world.perform_action(
+                        action, agent_idx, 0.25)
+                    if agent_done:
+                        agents_done[agent_idx] = True
+                    continue
+
                 # state = torch.tensor(state)
                 predictions = model(state)
 
@@ -143,6 +158,8 @@ def main():
 
                 value_actions = list(zip(sorted_values, sorted_actions))
                 i, j = world.current_positions[agent_idx]
+                i = round(i)
+                j = round(j)
 
                 tmp = 10
                 # print(frequent[i][j])
@@ -172,16 +189,19 @@ def main():
                 sorted_actions = list(map(lambda x: x[1], value_actions))
 
                 performed_the_move = False
+                action = sorted_actions[0]
                 for idx in range(len(sorted_actions)):
                     action = sorted_actions[idx]
 
                     if world.is_valid_action(action, agent_idx):
                         reward, agent_done, arrived = world.perform_action(
-                            action, agent_idx)
+                            action, agent_idx, 0.25)
                         if agent_done:
                             agents_done[agent_idx] = True
                         performed_the_move = True
                         break
+
+                old_actions[agent_idx] = action
 
                 if not performed_the_move:
                     raise RuntimeError("Cannot perform any move!")
@@ -191,11 +211,13 @@ def main():
                 pygame.time.wait(500)
                 old_position = world.current_positions
                 visualizer.draw_state(world, old_position)
-                pygame.time.wait(200)
+                pygame.time.wait(500)
                 done = True
                 break
             else:
-                pygame.time.wait(200)
+                pygame.time.wait(500)
+
+            counter += 1
 
 
 if __name__ == '__main__':
