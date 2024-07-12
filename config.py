@@ -8,7 +8,7 @@ class args:
     state_dimension = 65
     num_agents = 14
 
-    num_epochs = 2000
+    num_epochs = 4000
     learning_rate = 2e-2
     sync_rate = 40
     replay_size = 10000
@@ -16,7 +16,7 @@ class args:
     patient_factor = 10
     warmup_steps = 1000
 
-    visualize_ckpt = './lightning_logs/version_5/checkpoints/epoch=1999-step=16000.ckpt'
+    visualize_ckpt = './lightning_logs/version_16/checkpoints/epoch=636-step=5096.ckpt'
     train_ckpt = './lightning_logs/version_4/checkpoints/epoch=1999-step=16000.ckpt'
 
 

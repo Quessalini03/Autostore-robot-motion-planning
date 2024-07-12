@@ -6,6 +6,8 @@ import numpy as np
 import torch
 import pytorch_lightning as pl
 
+import matplotlib.pyplot as plt
+
 from lightning_model import DQNLightning
 from config import Action, args
 from agent import World
@@ -95,20 +97,56 @@ class Visualize:
         self._draw_goal(0, 0, (156, 100, 78))
         self._update_display()
 
+class DataPlot:
+    ideal_lengths = []
+    real_lengths = []
+    time = []
+
+def flatten_list(nested_list):
+    flat_list = []
+    for item in nested_list:
+        if isinstance(item, list):
+            flat_list.extend(flatten_list(item))
+        else:
+            flat_list.append(item)
+    return flat_list
+
 def main():
     visualizer = Visualize(800, 800, args.num_rows, args.num_columns, args.num_agents)
     model = DQNLightning.load_from_checkpoint(args.visualize_ckpt)
     model.eval()
+    
+    for i in range(args.num_agents):
+        DataPlot.ideal_lengths.append([])
+        DataPlot.real_lengths.append([])
+        DataPlot.time.append(0)
 
-    while True:
+    isRunnning = True
+    while isRunnning:
+        
         world = World(args.num_rows, args.num_columns, args.num_agents)
         done = False
         agents_done = [False] * args.num_agents
         frequent = world.frequent
-        while not done:
+        
+        for agent_idx in range(args.num_agents):
+            x1, y1 = world.current_positions[agent_idx]
+            x2, y2 = world.goal_positions[agent_idx]
+            d = abs(x2 - x1) + abs(y2 - y1)
+            DataPlot.ideal_lengths[agent_idx].append(d)
+        
+        Time = 0    
+        
+        while not done and isRunnning:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    isRunnning = False
+            Time += 1
             old_position = world.current_positions.copy()
             for agent_idx in range(world.num_bots):
                 if agents_done[agent_idx]:
+                    if len(DataPlot.ideal_lengths[agent_idx]) > len(DataPlot.real_lengths[agent_idx]):
+                        DataPlot.real_lengths[agent_idx].append(Time)
                     continue
                 agent = world.agent_lists[agent_idx]
                 state = agent.get_state()
@@ -120,31 +158,28 @@ def main():
                 value_actions = list(zip(sorted_values, sorted_actions))
                 i, j = world.current_positions[agent_idx]
                 
-                tmp = 10
-                #print(frequent[i][j])
+                percent_degree = 10
+                #print(frequent[agent_idx][i][j])
                 
                 for tup_idx in range(len(value_actions)):
                     val, action = value_actions[tup_idx]
                     if not world.is_valid_action(action, agent_idx):
                         continue
                     if action == Action.STATIC:
-                        val = val * (1 - tmp * frequent[i][j] / 100.0)
+                        val = val * (1 - percent_degree * frequent[agent_idx][i][j] / 100.0)
                     elif action == Action.LEFT:
-                        val = val * (1 - tmp * frequent[i - 1][j] / 100.0)
+                        val = val * (1 - percent_degree * frequent[agent_idx][i - 1][j] / 100.0)
                     elif action == Action.DOWN:
-                        val = val * (1 - tmp * frequent[i][j + 1] / 100.0)
+                        val = val * (1 - percent_degree * frequent[agent_idx][i][j + 1] / 100.0)
                     elif action == Action.RIGHT:
-                        val = val * (1 - tmp * frequent[i + 1][j] / 100.0)
+                        val = val * (1 - percent_degree * frequent[agent_idx][i + 1][j] / 100.0)
                     elif action == Action.UP:
-                        val = val * (1 - tmp * frequent[i][j - 1] / 100.0)
+                        val = val * (1 - percent_degree * frequent[agent_idx][i][j - 1] / 100.0)
                         
                     value_actions[tup_idx] = val, action
                     
                 value_actions.sort(reverse=True, key = lambda x: x[0])
                     
-                #print(value_actions[0][0], value_actions[1][0], value_actions[2][0], value_actions[3][0], value_actions[4][0])
-                #print(value_actions[0][1], value_actions[1][1], value_actions[2][1], value_actions[3][1], value_actions[4][1])
-                
                 sorted_actions = list(map(lambda x: x[1], value_actions))
                 
                 performed_the_move = False
@@ -163,15 +198,53 @@ def main():
             visualizer.draw_state(world, old_position)
             
             if all(agents_done):
-                pygame.time.wait(500)
+                pygame.time.wait(100)
                 old_position = world.current_positions
                 visualizer.draw_state(world, old_position)
-                pygame.time.wait(500)
+                pygame.time.wait(100)
                 done = True
                 break
             else:
-                pygame.time.wait(500)
+                pygame.time.wait(100)
+            
+    print(DataPlot.ideal_lengths)    
+    print(DataPlot.real_lengths)    
+    
+    for i in range(args.num_agents):
+        if len(DataPlot.ideal_lengths[agent_idx]) > len(DataPlot.real_lengths[agent_idx]):
+            DataPlot.ideal_lengths[i].pop()
 
+    DataPlot.ideal_lengths = flatten_list(DataPlot.ideal_lengths)
+    DataPlot.real_lengths = flatten_list(DataPlot.real_lengths)
+
+    DataPlot.real_lengths = list(map(lambda x: round(x), DataPlot.real_lengths))
+    print(DataPlot.ideal_lengths)
+    print(DataPlot.real_lengths)
+
+    val = []
+    temp = []
+
+    for i in range(len(DataPlot.ideal_lengths)):
+        if DataPlot.ideal_lengths[i] == 0:
+            DataPlot.ideal_lengths[i] = 1
+        val.append(DataPlot.real_lengths[i] / DataPlot.ideal_lengths[i])
+
+    sum_val = 0
+    y3 = []
+    for i in range(len(val)):
+        sum_val += val[i]
+        y3.append(sum_val / (i + 1))
+
+    plt.plot(range(len(val)), y3, marker='o', linestyle='-', color='red', label='Rate')
+
+    plt.xlabel('ith completions')
+    plt.ylabel('Average ratio between real path and ideal path')
+
+    plt.title('Ratio graph between actual and ideal path')
+
+    plt.legend()
+
+    plt.show()
 
 if __name__ == '__main__':
     main()
