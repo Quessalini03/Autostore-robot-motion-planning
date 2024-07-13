@@ -244,7 +244,7 @@ class Evaluator(BaseEvaluator):
                         continue
                     agent: Agent = world.agent_lists[agent_idx]
                     state = agent.get_state()
-                    state = agent.get_state()
+                    # state = agent.get_state()
                     # if agent.should_force_policy():
                     #     action = agent.get_action(self.policy_net_DDQN, state)
                     #     reward, done, arrived = agent.perform_action(action)

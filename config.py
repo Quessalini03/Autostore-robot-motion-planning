@@ -6,7 +6,7 @@ class args:
     num_columns = 13
     num_rows = 13
     state_dimension = 65
-    num_agents = 10
+    num_agents = 4
 
     num_epochs = 10000
     learning_rate = 0.0001

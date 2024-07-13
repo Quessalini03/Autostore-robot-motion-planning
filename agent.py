@@ -225,6 +225,7 @@ class World:
            curr_row >= self.num_rows or \
            curr_column < 0 or \
            curr_row < 0:
+            print("Agent ", agent_index, " is out of bounds")
             return False
 
         for i in range(self.num_bots):
@@ -233,6 +234,7 @@ class World:
             if self.agent_lists[i].is_alive == False:
                 continue
             if self.current_positions[i] == current_position:
+                print("Agent ", agent_index, " is colliding with agent ", i)
                 return False
             x1, y1 = self.current_positions[i]
             x2, y2 = current_position
