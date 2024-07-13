@@ -327,8 +327,29 @@ class Agent:
 
         return True
 
+    @staticmethod
+    def round_pos(tuple):
+        # 0.25 -> 1
+        # -0.25 -> -1
+        x, y = tuple
+        x = round(x, 2)
+        y = round(y, 2)
+
+        if x > 0:
+            x = math.ceil(x)
+        else:
+            x = math.floor(x)
+
+        if y > 0:
+            y = math.ceil(y)
+        else:
+            y = math.floor(y)
+
+        return x, y
+
     def get_heuristic_action(self):
         current_position = self.world.current_positions[self.index_in_world]
+        current_position = Agent.round_pos(current_position)
         goal_position = self.temporary_goal
 
         current_col, current_row = current_position
