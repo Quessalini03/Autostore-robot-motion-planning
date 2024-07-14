@@ -130,7 +130,6 @@ def main():
         done = False
         agents_done = [False] * args.num_agents
         frequent = world.frequent
-        counter = 0
         old_actions = [0] * args.num_agents
         while not done:
             old_position = world.current_positions.copy()
@@ -141,10 +140,10 @@ def main():
                 state = agent.get_state()
 
                 # state = torch.tensor(state)
-                # predictions = model(state)
+                predictions = model(state)
 
-                # sorted_values, sorted_actions = torch.sort(
-                #     predictions, descending=True)
+                sorted_values, sorted_actions = torch.sort(
+                    predictions, descending=True)
 
                 if agent.should_move_heuristic(state):
                     sorted_actions = torch.tensor(
@@ -157,41 +156,41 @@ def main():
                         predictions, descending=True)
                     agent.post_normal_policy()
 
-                # value_actions = list(zip(sorted_values, sorted_actions))
-                # i, j = world.current_positions[agent_idx]
-                # i = round(i)
-                # j = round(j)
+                value_actions = list(zip(sorted_values, sorted_actions))
+                i, j = world.current_positions[agent_idx]
 
-                # tmp = 10
-                # # print(frequent[i][j])
-                # frequent[i][j] += 1
+                tmp = 10
+                # print(frequent[i][j])
+                frequent[i][j] += 1
 
-                # for tup_idx in range(len(value_actions)):
-                #     val, action = value_actions[tup_idx]
-                #     if not world.is_valid_action(action, agent_idx):
-                #         continue
-                #     if action == Action.STATIC:
-                #         val = val * (1 - tmp * frequent[i][j] / 100.0)
-                #     elif action == Action.LEFT:
-                #         val = val * (1 - tmp * frequent[i - 1][j] / 100.0)
-                #     elif action == Action.DOWN:
-                #         val = val * (1 - tmp * frequent[i][j + 1] / 100.0)
-                #     elif action == Action.RIGHT:
-                #         val = val * (1 - tmp * frequent[i + 1][j] / 100.0)
-                #     elif action == Action.UP:
-                #         val = val * (1 - tmp * frequent[i][j - 1] / 100.0)
+                for tup_idx in range(len(value_actions)):
+                    val, action = value_actions[tup_idx]
+                    if not world.is_valid_action(action, agent_idx):
+                        continue
+                    if action == Action.STATIC:
+                        val = val * (1 - tmp * frequent[i][j] / 100.0)
+                    elif action == Action.LEFT:
+                        val = val * (1 - tmp * frequent[i - 1][j] / 100.0)
+                    elif action == Action.DOWN:
+                        val = val * (1 - tmp * frequent[i][j + 1] / 100.0)
+                    elif action == Action.RIGHT:
+                        val = val * (1 - tmp * frequent[i + 1][j] / 100.0)
+                    elif action == Action.UP:
+                        val = val * (1 - tmp * frequent[i][j - 1] / 100.0)
 
-                #     value_actions[tup_idx] = val, action
+                    value_actions[tup_idx] = val, action
 
-                # value_actions.sort(reverse=True, key=lambda x: x[0])
+                value_actions.sort(reverse=True, key=lambda x: x[0])
 
-                # print(value_actions[0][0], value_actions[1][0], value_actions[2][0], value_actions[3][0], value_actions[4][0])
-                # print(value_actions[0][1], value_actions[1][1], value_actions[2][1], value_actions[3][1], value_actions[4][1])
+                # print(value_actions[0][0], value_actions[1][0], value_actions[2]
+                #       [0], value_actions[3][0], value_actions[4][0])
+                # print(value_actions[0][1], value_actions[1][1], value_actions[2]
+                #       [1], value_actions[3][1], value_actions[4][1])
 
-                # sorted_actions = list(map(lambda x: x[1], value_actions))
+                sorted_actions = list(map(lambda x: x[1], value_actions))
 
                 performed_the_move = False
-                # action = sorted_actions[0]
+                action = sorted_actions[0]
                 for idx in range(len(sorted_actions)):
                     action = sorted_actions[idx]
 
@@ -215,16 +214,14 @@ def main():
             visualizer.draw_state(world, old_position)
 
             if all(agents_done):
-                pygame.time.wait(75)
+                pygame.time.wait(200)
                 old_position = world.current_positions
                 visualizer.draw_state(world, old_position)
                 pygame.time.wait(500)
                 done = True
                 break
             else:
-                pygame.time.wait(75)
-
-            counter += 1
+                pygame.time.wait(200)
 
 
 if __name__ == '__main__':
