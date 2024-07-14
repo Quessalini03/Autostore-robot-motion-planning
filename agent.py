@@ -13,7 +13,7 @@ from models.QNet import QNetwork, QLoss, ReplayMemory, Experience
 
 
 class World:
-    def __init__(self, num_columns, num_rows, num_bots, obstacle_matrix = None) -> None:
+    def __init__(self, num_columns, num_rows, num_bots, obstacle_matrix=None) -> None:
         self.num_columns = num_columns
         self.num_rows = num_rows
         self.num_bots = num_bots

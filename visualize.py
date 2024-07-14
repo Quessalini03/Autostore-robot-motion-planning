@@ -76,10 +76,7 @@ class Visualize:
 
         for agent_idx, agent_position in enumerate(world.current_positions):
             color = self.colors_list[agent_idx]
-            # column, row = agent_position
-            column, row = (agent_position[0] - old_position[agent_idx][0]) * 2 + \
-                old_position[agent_idx][0], (agent_position[1] -
-                                             old_position[agent_idx][1]) * 2 + old_position[agent_idx][1]
+            column, row = agent_position
 
             self._draw_box(column, row, color, True)
 
@@ -142,15 +139,6 @@ def main():
                     continue
                 agent = world.agent_lists[agent_idx]
                 state = agent.get_state()
-                
-
-                if counter % 4 != 0:
-                    action = old_actions[agent_idx]
-                    reward, agent_done, arrived = world.perform_action(
-                        action, agent_idx, 0.25)
-                    if agent_done:
-                        agents_done[agent_idx] = True
-                    continue
 
                 # state = torch.tensor(state)
                 # predictions = model(state)
@@ -159,8 +147,9 @@ def main():
                 #     predictions, descending=True)
 
                 if agent.should_move_heuristic(state):
-                    sorted_actions = torch.tensor([agent.get_heuristic_action()])
-                    print("Agent: ", agent_idx, " is moving with heuristic")
+                    sorted_actions = torch.tensor(
+                        [agent.get_heuristic_action()])
+                    # print("Agent: ", agent_idx, " is moving with heuristic")
                 else:
                     predictions = model(state)
 
@@ -208,13 +197,14 @@ def main():
 
                     if world.is_valid_action(action, agent_idx):
                         reward, agent_done, arrived = world.perform_action(
-                            action, agent_idx, 0.25)
+                            action, agent_idx, 1)
                         if agent_done:
                             agents_done[agent_idx] = True
                         performed_the_move = True
                         break
                     else:
-                        print("Agent: ", agent_idx, " is trying to move to: ", action)
+                        print("Agent: ", agent_idx,
+                              " is trying to move to: ", action)
                         print(state)
 
                 old_actions[agent_idx] = action
@@ -225,10 +215,10 @@ def main():
             visualizer.draw_state(world, old_position)
 
             if all(agents_done):
-                pygame.time.wait(500)
+                pygame.time.wait(75)
                 old_position = world.current_positions
                 visualizer.draw_state(world, old_position)
-                pygame.time.wait(75)
+                pygame.time.wait(500)
                 done = True
                 break
             else:
